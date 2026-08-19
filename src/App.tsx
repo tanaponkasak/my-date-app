@@ -151,7 +151,7 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
     setNoPos({ top: newTop, left: newLeft })
     setNoAttempts((a) => a + 1)
   }
-
+/*
   const handleNoHover = () => {
     const btn = noBtnRef.current
     if (!btn) return
@@ -176,7 +176,7 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
 
     setNoPos({ top: newTop, left: newLeft })
     setNoAttempts((a) => a + 1)
-  }
+  }*/
 
   const funnyMessages = [
     'แน่ใจนะ? 😢',
