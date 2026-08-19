@@ -19,17 +19,6 @@ const CINEMA_LIST = [
   'ScreenX',
 ]
 
-const BRANCH_LIST = [
-  'Major Ratchayothin',
-  'Major Pinklao',
-  'SF CentralWorld',
-  'SF Central Ladprao',
-  'Major Cineplex The Mall Bangkapi',
-  'Major Cineplex The Mall Ngamwongwan',
-  'SF Cinema Central Rama 9',
-  'SF Cinema The Mall Bangkae',
-]
-
 const SODA_FLAVORS = [
   'Coca-Cola',
   'Pepsi',
@@ -112,11 +101,11 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
   const noBtnRef = useRef<HTMLButtonElement>(null)
   const growIntervalRef = useRef<number | null>(null)
 
-  // ปุ่ม Yes ใหญ่ขึ้นเรื่อยๆ ทุกๆ 800ms
   useEffect(() => {
     growIntervalRef.current = window.setInterval(() => {
       setYesScale((s) => {
-        if (s >= 3.5) return s
+        const maxScale = window.innerWidth < 768 ? 2.5 : 3.5
+        if (s >= maxScale) return s
         return s + 0.08
       })
     }, 800)
@@ -125,7 +114,6 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
     }
   }, [])
 
-  // ปุ่ม No วิ่งหนีเมาส์
   const handleNoEscape = () => {
     const btn = noBtnRef.current
     if (!btn) return
@@ -138,7 +126,6 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
     let newLeft = Math.random() * maxX + padding
     let newTop = Math.random() * maxY + padding
 
-    // หลีกเลี่ยงตำแหน่งเดิม
     if (noPos) {
       const dx = Math.abs(newLeft - noPos.left)
       const dy = Math.abs(newTop - noPos.top)
@@ -151,32 +138,6 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
     setNoPos({ top: newTop, left: newLeft })
     setNoAttempts((a) => a + 1)
   }
-/*
-  const handleNoHover = () => {
-    const btn = noBtnRef.current
-    if (!btn) return
-
-    const btnRect = btn.getBoundingClientRect()
-    const padding = 20
-    const maxX = window.innerWidth - btnRect.width - padding
-    const maxY = window.innerHeight - btnRect.height - padding
-
-    let newLeft = Math.random() * maxX + padding
-    let newTop = Math.random() * maxY + padding
-
-    // หลีกเลี่ยงตำแหน่งเดิม (ให้ขยับอย่างน้อย 150px)
-    if (noPos) {
-      const dx = Math.abs(newLeft - noPos.left)
-      const dy = Math.abs(newTop - noPos.top)
-      if (dx < 150 || dy < 150) {
-        newLeft = (newLeft + window.innerWidth / 2) % maxX
-        newTop = (newTop + window.innerHeight / 2) % maxY
-      }
-    }
-
-    setNoPos({ top: newTop, left: newLeft })
-    setNoAttempts((a) => a + 1)
-  }*/
 
   const funnyMessages = [
     'แน่ใจนะ? 😢',
@@ -206,6 +167,7 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
         style={{
           transform: `scale(${yesScale})`,
           transition: 'transform 0.4s ease',
+          maxWidth: '90vw',
         }}
         onClick={onYes}
       >
@@ -228,7 +190,7 @@ function QuestionPage({ onYes }: { onYes: () => void }) {
   )
 }
 
-/* ==================== หน้าฟอร์ม ==================== */
+/* ==================== หน้าฟอร์ม (แก้ไขส่วนนี้) ==================== */
 function FormPage({
   data,
   setData,
@@ -238,19 +200,52 @@ function FormPage({
   setData: React.Dispatch<React.SetStateAction<DateData>>
   onSubmit: () => void
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false) // เพิ่ม state สำหรับโหลด
+
   const handleChange = (field: keyof DateData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    // ตรวจสอบว่ากรอกครบ
     const allFilled = Object.values(data).every((v) => v.trim() !== '')
     if (!allFilled) {
       alert('กรอกให้ครบทุกข้อนะคะ~ 💕')
       return
     }
-    onSubmit()
+
+    setIsSubmitting(true)
+    try {
+      const scriptUrl = import.meta.env.VITE_GOOGLE_SCRIPT_URL
+      
+      // ถ้ายังไม่ได้ใส่ URL ใน .env ให้แจ้งเตือน (สำหรับทดสอบในเครื่อง)
+      if (!scriptUrl) {
+        console.warn('ยังไม่ได้ตั้งค่า VITE_GOOGLE_SCRIPT_URL ในไฟล์ .env')
+        alert('ระบบพร้อม แต่ยังไม่มีการเชื่อมต่อ Google Sheets (ตั้งค่า .env ก่อนนะครับ)')
+        setIsSubmitting(false)
+        return
+      }
+
+      // ส่งข้อมูลไป Google Apps Script
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors', // จำเป็นต้องใช้สำหรับ Google Apps Script
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      // เนื่องจากใช้ no-cors เราจะเช็ค response ไม่ได้ แต่ถ้ามารอดถึงตรงนี้แสดงว่าส่งสำเร็จ
+      console.log('ส่งข้อมูลสำเร็จ!')
+      onSubmit() // ไปหน้า success
+      
+    } catch (error) {
+      console.error('Error:', error)
+      alert('ส่งข้อมูลไม่สำเร็จ ลองใหม่อีกครั้งนะ 😢')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -289,19 +284,14 @@ function FormPage({
         </div>
 
         <div className="form-group">
-          <label>📍 สาขา</label>
-          <select
+          <label>📍 สาขาที่สะดวก (ระบุเอง)</label>
+          <input
+            type="text"
+            placeholder="เช่น Major Ratchayothin, SF CentralWorld"
             value={data.branch}
             onChange={(e) => handleChange('branch', e.target.value)}
             required
-          >
-            <option value="">-- เลือกสาขา --</option>
-            {BRANCH_LIST.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         <div className="form-group">
@@ -347,8 +337,16 @@ function FormPage({
           </select>
         </div>
 
-        <button type="submit" className="submit-btn">
-          ยืนยันการเดต 💌
+        <button 
+          type="submit" 
+          className="submit-btn"
+          disabled={isSubmitting}
+          style={{ 
+            opacity: isSubmitting ? 0.6 : 1,
+            cursor: isSubmitting ? 'not-allowed' : 'pointer'
+          }}
+        >
+          {isSubmitting ? 'กำลังบันทึกข้อมูล...' : 'ยืนยันการเดต 💌'}
         </button>
       </form>
     </div>
@@ -358,7 +356,6 @@ function FormPage({
 /* ==================== หน้าสำเร็จ ==================== */
 function SuccessPage({ data }: { data: DateData }) {
   useEffect(() => {
-    // Confetti effect
     const emojis = ['💖', '💕', '🎉', '✨', '🌸', '💘', '🎊']
     const interval = setInterval(() => {
       const confetti = document.createElement('div')
